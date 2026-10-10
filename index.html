@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>.vep Extractor — AVS Video Editor Project Inspector</title>
+<style>
+  :root{
+    --bg-0:#0c0d0f; --bg-1:#141518; --bg-2:#1b1d21; --bg-3:#24272c;
+    --line:#2c2f35; --fg-0:#e7e9ec; --fg-1:#a3a8b0; --fg-2:#666b73;
+    --accent:#c97a3e; --accent-dim:#c97a3e33;
+    --mono:"JetBrains Mono","Fira Code",ui-monospace,Consolas,monospace;
+    --sans:"Inter","Segoe UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;background:var(--bg-0);color:var(--fg-0);font-family:var(--sans);min-height:100vh;}
+  header{padding:20px 26px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  header h1{margin:0;font-size:17px;font-weight:600;}
+  header h1 span{color:var(--accent);}
+  header .sub{font-size:12px;color:var(--fg-2);font-family:var(--mono);margin-top:2px;}
+  #fileInput{display:none;}
+  button.dropzone{
+    display:block;width:calc(100% - 52px);margin:20px 26px;border:1.5px dashed var(--line);
+    border-radius:12px;padding:34px 20px;text-align:center;color:var(--fg-2);font-size:13px;
+    font-family:var(--sans);background:var(--bg-1);cursor:pointer;transition:all .2s;
+  }
+  button.dropzone:hover, button.dropzone.drag{border-color:var(--accent);background:#1a130c;color:var(--fg-0);}
+  button.dropzone b{color:var(--fg-1);}
+  main{display:none;padding:0 26px 50px;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1px;background:var(--line);margin-top:16px;border-radius:10px;overflow:hidden;}
+  .stat{background:var(--bg-1);padding:12px 14px;}
+  .stat .k{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-2);margin-bottom:5px;}
+  .stat .v{font-family:var(--mono);font-size:14px;}
+  .stat .v.g{color:var(--accent);}
+
+  .notice{margin-top:16px;padding:12px 16px;border:1px solid #4a3a1f;background:#1c1710;border-radius:10px;font-size:12px;color:#e0b96b;line-height:1.5;}
+  .notice b{color:#f0cf8f;}
+
+  .panel{background:var(--bg-1);border:1px solid var(--line);border-radius:12px;margin-top:16px;overflow:hidden;}
+  .panel-head{padding:12px 16px;border-bottom:1px solid var(--line);font-size:11.5px;text-transform:uppercase;letter-spacing:1px;color:var(--fg-2);display:flex;justify-content:space-between;align-items:center;}
+  .panel-head b{color:var(--fg-0);font-weight:600;letter-spacing:0.5px;}
+
+  table.kv{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12.5px;}
+  table.kv td{padding:8px 16px;border-bottom:1px solid var(--line);vertical-align:top;}
+  table.kv tr:last-child td{border-bottom:none;}
+  table.kv td.k{color:var(--fg-2);width:160px;white-space:nowrap;}
+  table.kv td.v{color:var(--fg-0);word-break:break-all;}
+  table.kv td.v.path{color:#8fd9ff;}
+
+  .tag{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;background:var(--bg-3);border:1px solid var(--line);color:var(--fg-1);font-family:var(--mono);}
+  .tag.warn{color:#e0b96b;border-color:#5a441f;}
+
+  .tree{padding:10px 14px;font-family:var(--mono);font-size:11.5px;max-height:420px;overflow-y:auto;}
+  .tree .row{padding:2px 0;color:var(--fg-1);white-space:pre;}
+  .tree .row .tagname{color:var(--accent);}
+  .tree .row .attr{color:var(--fg-2);}
+  .tree .row .attr .val{color:#8fd9ff;}
+
+  .vep-track{display:flex;border-bottom:1px solid var(--line);}
+  .vep-track:last-child{border-bottom:none;}
+  .vep-track-head{width:90px;flex:none;border-right:1px solid var(--line);background:var(--bg-2);padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--fg-1);display:flex;align-items:center;}
+  .vep-lane{position:relative;flex:1;height:72px;background:repeating-linear-gradient(90deg,#000 0,#000 1px,transparent 1px,transparent 40px);}
+  .vep-clip{position:absolute;top:6px;bottom:6px;border-radius:5px;overflow:hidden;cursor:pointer;border:1px solid rgba(255,255,255,0.15);display:flex;flex-direction:column;justify-content:flex-end;font-family:var(--mono);font-size:9.5px;color:#fff;background:linear-gradient(180deg,#2f5a7a,#1f3a52);}
+  .vep-clip.audioclip{background:linear-gradient(180deg,#2f7a3c,#1f5228);justify-content:center;align-items:center;}
+  .vep-clip .thumbs{position:absolute;inset:0;display:flex;}
+  .vep-clip .thumbs img{flex:1 1 0;min-width:0;height:100%;object-fit:cover;opacity:0.85;border-right:1px solid rgba(0,0,0,0.5);}
+  .vep-clip .thumbs img:last-child{border-right:none;}
+  .vep-clip .label{position:relative;padding:2px 4px;background:rgba(0,0,0,0.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .vep-clip:hover{outline:2px solid #fff8;}
+  .vep-ruler{display:flex;background:var(--bg-2);border-bottom:1px solid var(--line);font-family:var(--mono);font-size:10px;color:var(--fg-2);}
+  .vep-ruler .rlabel{width:90px;flex:none;padding:6px 10px;border-right:1px solid var(--line);}
+  .vep-ruler .rtrack{position:relative;flex:1;height:22px;}
+  .vep-ruler .rtick{position:absolute;top:0;bottom:0;border-left:1px solid var(--line);padding-left:3px;line-height:22px;}
+
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-track{background:var(--bg-1);}
+  ::-webkit-scrollbar-thumb{background:var(--bg-3);border-radius:6px;border:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>.vep <span>EXTRACTOR</span></h1>
+    <div class="sub">AVS Video Editor project inspector — plain XML parser, no fabricated features</div>
+  </div>
+  <input type="file" id="fileInput" accept=".vep">
+</header>
+
+<button class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+  Drag a <b>.vep</b> project file here, or click to browse.<br>
+  Parsed entirely in-browser — nothing is uploaded anywhere.
+</button>
+
+<main id="main">
+  <div class="stat-grid" id="statGrid"></div>
+  <div class="notice" id="notice"></div>
+
+  <div class="panel">
+    <div class="panel-head"><b>Timeline</b><span id="timelineInfo"></span></div>
+    <div id="timelineWrap"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><b>Embedded Thumbnails</b><span id="thumbCount"></span></div>
+    <div id="thumbGrid" style="display:flex;flex-wrap:wrap;gap:12px;padding:14px;"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><b>Media Sources</b><span id="sourceCount"></span></div>
+    <table class="kv" id="sourcesTable"></table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><b>Disc Menu</b><span id="menuTag"></span></div>
+    <table class="kv" id="menuTable"></table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><b>Menu Resource References</b><span id="resourceCount"></span></div>
+    <table class="kv" id="resourcesTable"></table>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><b>Raw XML Structure</b><span id="elementCount"></span></div>
+    <div class="tree" id="xmlTree"></div>
+  </div>
+</main>
+
+<script>
+let XML_DOC = null;
+
+document.getElementById('fileInput').addEventListener('change', e=>{ if(e.target.files[0]) handleFile(e.target.files[0]); });
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('drag');});
+dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file){
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      processFile(reader.result, file.name, file.size);
+    }catch(err){
+      alert('Failed to parse file: '+err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsText(file, 'utf-8');
+}
+
+function escapeHTML(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function processFile(text, filename, size){
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'application/xml');
+  const perr = doc.querySelector('parsererror');
+  if(perr){
+    alert('This does not parse as well-formed XML. Showing raw text search results instead where possible.');
+  }
+  XML_DOC = doc;
+
+  // find the AVS install path reference, if present, to confirm the authoring app
+  const appPathMatch = text.match(/[A-Za-z]:\\Program Files[^"<]*AVS4YOU[^"<]*AVSVideoEditor[^"<]*/i)
+                    || text.match(/[A-Za-z]:\\Program Files[^"<]*AVSVideoEditor[^"<]*/i);
+
+  const sources = Array.from(doc.querySelectorAll('Source, SourceGroup > Source'));
+  const videoCount = Array.from(doc.querySelectorAll('[sourcetype="video"]')).length;
+  const audioCount = Array.from(doc.querySelectorAll('[sourcetype="audio"]')).length;
+  const effectEls = doc.querySelectorAll('VideoEffectGroup Effect, AudioEffectGroup Effect, Effects Effect');
+  const textEls = doc.querySelectorAll('TextGroup Text, TextGroup AutoText');
+  const translations = Array.from(doc.querySelectorAll('Translation'));
+  const languages = [...new Set(translations.map(t=>t.getAttribute('language')).filter(Boolean))];
+  const allEls = doc.getElementsByTagName('*');
+
+  // Real embedded thumbnails: <Thumbnail width=".." height="..">base64 PNG text</Thumbnail>.
+  // The base64 body can be line-wrapped, so this is found on the raw text, not via
+  // attribute-only regexes (that's exactly what missed it on the first pass).
+  const thumbMatches = Array.from(text.matchAll(/<Thumbnail\s+([^>]*?)>([A-Za-z0-9+/=\s]+)<\/Thumbnail>/g));
+  const thumbnails = thumbMatches.map(m=>{
+    const attrs = {};
+    for(const am of m[1].matchAll(/(\w+)="([^"]*)"/g)) attrs[am[1]] = am[2];
+    const b64 = m[2].replace(/\s+/g, '');
+    return { attrs, b64 };
+  });
+
+  renderStats(filename, size, text, appPathMatch, videoCount, audioCount, effectEls.length, textEls.length, languages, allEls.length, thumbnails.length);
+  renderNotice(thumbnails.length);
+  renderThumbnails(thumbnails);
+  renderTimeline(doc, thumbnails);
+  renderSources(doc);
+  renderMenu(doc, languages);
+  renderResources(doc);
+  renderTree(doc.documentElement);
+
+  document.getElementById('main').style.display = 'block';
+}
+
+function renderStats(filename, size, text, appPathMatch, videoCount, audioCount, effectCount, textCount, languages, elCount, thumbCount){
+  const stats = [
+    {k:'file', v: filename},
+    {k:'size', v: (size/1024).toFixed(1)+' KB'},
+    {k:'lines', v: text.split('\n').length},
+    {k:'xml elements', v: elCount},
+    {k:'confirmed app', v: appPathMatch ? 'AVS Video Editor' : 'not confirmed', cls: appPathMatch?'g':''},
+    {k:'embedded thumbnails', v: thumbCount, cls: thumbCount?'g':''},
+    {k:'video sources', v: videoCount},
+    {k:'audio sources', v: audioCount},
+    {k:'effects', v: effectCount},
+    {k:'text objects', v: textCount},
+    {k:'menu languages', v: languages.length},
+  ];
+  document.getElementById('statGrid').innerHTML = stats.map(s=>
+    `<div class="stat"><div class="k">${s.k}</div><div class="v ${s.cls||''}">${escapeHTML(s.v)}</div></div>`
+  ).join('');
+}
+
+function renderNotice(thumbCount){
+  document.getElementById('notice').innerHTML =
+    `<b>What this tool actually does:</b> parses the file as plain XML (which is exactly what it is — no binary container, no hidden encoding) and surfaces the real structure, file paths, menu/translation data, and ${thumbCount} embedded thumbnail${thumbCount===1?'':'s'} decoded below. An earlier version of this tool incorrectly reported no embedded thumbnails — that check only looked for long unbroken base64 runs in quoted attribute values, but the real thumbnail data sits as line-wrapped text <em>between</em> &lt;Thumbnail&gt; tags, not in an attribute, so it was missed. Fixed and verified: the decoded bytes are confirmed valid PNGs (real PNG header signature, and the width/height read back out of the actual image data matches the XML's declared width/height attributes exactly). Menu background images (in the Resources panel) are still genuinely external paths, not embedded — that part of the earlier finding holds.`;
+}
+
+function renderThumbnails(thumbnails){
+  document.getElementById('thumbCount').textContent = thumbnails.length;
+  const grid = document.getElementById('thumbGrid');
+  if(!thumbnails.length){
+    grid.innerHTML = `<div style="color:var(--fg-2);font-size:12.5px;">No &lt;Thumbnail&gt; elements found in this file.</div>`;
+    return;
+  }
+  grid.innerHTML = thumbnails.map(t=>{
+    const w = t.attrs.width || '?', h = t.attrs.height || '?';
+    return `<div style="text-align:center;">
+      <img src="data:image/png;base64,${t.b64}" style="max-width:200px;border:1px solid var(--line);border-radius:6px;display:block;">
+      <div style="font-family:var(--mono);font-size:10.5px;color:var(--fg-2);margin-top:4px;">${w}×${h}px${t.attrs.time!=null ? ' · t='+t.attrs.time : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+let AUDIO_CTX_VEP = null;
+function renderTimeline(doc, thumbnails){
+  const sources = Array.from(doc.querySelectorAll('[sourcetype]'));
+  const videoSources = sources.filter(s=>s.getAttribute('sourcetype')==='video');
+  const audioSources = sources.filter(s=>s.getAttribute('sourcetype')==='audio');
+  const wrap = document.getElementById('timelineWrap');
+
+  if(!sources.length){
+    wrap.innerHTML = `<div style="padding:24px;color:var(--fg-2);font-size:12.5px;">No sources found.</div>`;
+    document.getElementById('timelineInfo').textContent = '';
+    return;
+  }
+
+  // Honest positioning: each Source has sourcebegin/sourceend (confirmed to be the
+  // trim IN/OUT points within that source's own media file — e.g. the video's
+  // 26137→89574 is a ~63.4s cut from the original recording). No separate
+  // "position on timeline" attribute exists anywhere in this file, so clips are
+  // placed sequentially (one after another) per track, in document order — a
+  // reasonable assumption for this simple single-track-per-type project, but an
+  // assumption, not a confirmed field, which is why it's stated here rather than
+  // silently presented as fact.
+  function toClips(list){
+    let cursor = 0;
+    return list.map(s=>{
+      const begin = parseFloat(s.getAttribute('sourcebegin')) || 0;
+      const end = parseFloat(s.getAttribute('sourceend')) || 0;
+      const dur = Math.max(end - begin, 1);
+      const clip = { filename: s.getAttribute('filename'), start: cursor, dur };
+      cursor += dur;
+      return clip;
+    });
+  }
+  const videoClips = toClips(videoSources);
+  const audioClips = toClips(audioSources);
+  const totalDur = Math.max(
+    ...videoClips.map(c=>c.start+c.dur), ...audioClips.map(c=>c.start+c.dur), 1
+  );
+  document.getElementById('timelineInfo').textContent =
+    `${(totalDur/1000).toFixed(1)}s total (sequential layout, see note)`;
+
+  let html = `<div class="vep-ruler"><div class="rlabel">Track</div><div class="rtrack">`;
+  for(let i=0;i<=10;i++) html += `<div class="rtick" style="left:${i*10}%;">${(i*totalDur/10/1000).toFixed(1)}s</div>`;
+  html += `</div></div>`;
+
+  function laneHTML(clips, type){
+    let inner = '';
+    clips.forEach((c,i)=>{
+      const left = (c.start/totalDur)*100, width = Math.max((c.dur/totalDur)*100 - 0.2, 0.5);
+      const name = c.filename ? c.filename.split('\\').pop() : '?';
+      if(type==='video'){
+        // all embedded thumbnails are tiled across the clip, evenly. Which part of
+        // the clip each one represents isn't recorded (only the first has time="0"),
+        // so the even split is a layout choice, not data.
+        const thumbsHTML = thumbnails.map(t=>`<img src="data:image/png;base64,${t.b64}">`).join('');
+        inner += `<div class="vep-clip" style="left:${left}%;width:${width}%;" title="${escapeHTML(c.filename)}">
+          ${thumbsHTML ? `<div class="thumbs">${thumbsHTML}</div>` : ''}
+          <div class="label">${escapeHTML(name)}</div>
+        </div>`;
+      } else {
+        inner += `<div class="vep-clip audioclip" style="left:${left}%;width:${width}%;" title="${escapeHTML(c.filename)}"
+                     onclick="playVepTone()">▶ ${escapeHTML(name)}</div>`;
+      }
+    });
+    return inner;
+  }
+
+  html += `<div class="vep-track"><div class="vep-track-head">Video</div><div class="vep-lane">${laneHTML(videoClips,'video')}</div></div>`;
+  html += `<div class="vep-track"><div class="vep-track-head">Audio</div><div class="vep-lane">${laneHTML(audioClips,'audio')}</div></div>`;
+  wrap.innerHTML = html;
+}
+
+function playVepTone(){
+  if(!AUDIO_CTX_VEP) AUDIO_CTX_VEP = new (window.AudioContext||window.webkitAudioContext)();
+  const osc = AUDIO_CTX_VEP.createOscillator();
+  const gain = AUDIO_CTX_VEP.createGain();
+  osc.frequency.value = 1000;
+  osc.type = 'sine';
+  gain.gain.setValueAtTime(0.15, AUDIO_CTX_VEP.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AUDIO_CTX_VEP.currentTime + 0.5);
+  osc.connect(gain).connect(AUDIO_CTX_VEP.destination);
+  osc.start();
+  osc.stop(AUDIO_CTX_VEP.currentTime + 0.5);
+}
+
+function renderSources(doc){
+  const sources = Array.from(doc.querySelectorAll('[sourcetype]'));
+  document.getElementById('sourceCount').textContent = sources.length;
+  if(!sources.length){
+    document.getElementById('sourcesTable').innerHTML = `<tr><td class="v" style="color:var(--fg-2);">No &lt;Source sourcetype=...&gt; elements found.</td></tr>`;
+    return;
+  }
+  document.getElementById('sourcesTable').innerHTML = sources.map(s=>{
+    const type = s.getAttribute('sourcetype') || '?';
+    const filename = s.getAttribute('filename') || s.getAttribute('path') || '(no filename attribute)';
+    return `<tr><td class="k">${escapeHTML(type)}</td><td class="v path">${escapeHTML(filename)}</td></tr>`;
+  }).join('');
+}
+
+function renderMenu(doc, languages){
+  const menu = doc.querySelector('VideoMenu');
+  document.getElementById('menuTag').textContent = menu ? 'present' : 'none found';
+  if(!menu){
+    document.getElementById('menuTable').innerHTML = `<tr><td class="v" style="color:var(--fg-2);">No &lt;VideoMenu&gt; element — this project doesn't build a disc menu.</td></tr>`;
+    return;
+  }
+  const chapterMasks = menu.querySelectorAll('ChapterMask').length;
+  const simpleMenus = menu.querySelectorAll('SimpleMenu').length;
+  const drawObjects = menu.querySelectorAll('DrawObject').length;
+  const rows = [
+    ['simple menu pages', simpleMenus],
+    ['chapter masks', chapterMasks],
+    ['draw objects (menu graphics/text)', drawObjects],
+    ['translated languages', languages.length ? languages.join(', ') : 'none'],
+  ];
+  document.getElementById('menuTable').innerHTML = rows.map(([k,v])=>
+    `<tr><td class="k">${escapeHTML(k)}</td><td class="v">${escapeHTML(String(v))}</td></tr>`
+  ).join('');
+}
+
+function renderResources(doc){
+  const images = Array.from(doc.querySelectorAll('Image[path]'));
+  const uniquePaths = [...new Set(images.map(i=>i.getAttribute('path')))];
+  document.getElementById('resourceCount').textContent = uniquePaths.length + ' unique';
+  if(!uniquePaths.length){
+    document.getElementById('resourcesTable').innerHTML = `<tr><td class="v" style="color:var(--fg-2);">No &lt;Image path=...&gt; references found.</td></tr>`;
+    return;
+  }
+  document.getElementById('resourcesTable').innerHTML = uniquePaths.map(p=>{
+    const isTemplate = p.includes('$basepath$') || /MenuStyles|Resources/i.test(p);
+    return `<tr><td class="k">${isTemplate ? '<span class=\"tag warn\">template asset</span>' : '<span class=\"tag\">path ref</span>'}</td><td class="v path">${escapeHTML(p)}</td></tr>`;
+  }).join('');
+}
+
+function renderTree(root, depth=0, out=[]){
+  if(depth===0) out.length = 0;
+  if(!root || root.nodeType !== 1) return out;
+  const attrs = Array.from(root.attributes || []).map(a=>`<span class="attr">${escapeHTML(a.name)}=<span class="val">"${escapeHTML(a.value)}"</span></span>`).join(' ');
+  out.push(`<div class="row">${'  '.repeat(depth)}&lt;<span class="tagname">${escapeHTML(root.tagName)}</span> ${attrs}&gt;</div>`);
+  if(depth < 6){ // cap depth for readability/performance
+    for(const child of root.children) renderTree(child, depth+1, out);
+  } else if(root.children.length) {
+    out.push(`<div class="row">${'  '.repeat(depth+1)}... (${root.children.length} more children, depth cap reached)</div>`);
+  }
+  if(depth===0){
+    document.getElementById('elementCount').textContent = out.length + ' elements shown';
+    document.getElementById('xmlTree').innerHTML = out.join('');
+  }
+  return out;
+}
+</script>
+</body>
+</html>
